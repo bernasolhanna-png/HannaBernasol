@@ -14,6 +14,18 @@ def init_db():
             status TEXT NOT NULL
         )
     """)
+    # Insert 5 sample students if table is empty
+    cursor.execute("SELECT COUNT(*) FROM students")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        sample_students = [
+            ("Alice", "active"),
+            ("Bob", "inactive"),
+            ("Charlie", "active"),
+            ("Diana", "active"),
+            ("Ethan", "inactive")
+        ]
+        cursor.executemany("INSERT INTO students (name, status) VALUES (?, ?)", sample_students)
     conn.commit()
     conn.close()
 
