@@ -14,18 +14,6 @@ def init_db():
             status TEXT NOT NULL
         )
     """)
-    # Insert 5 sample students if table is empty
-    cursor.execute("SELECT COUNT(*) FROM students")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        sample_students = [
-            ("Alice", "active"),
-            ("Bob", "inactive"),
-            ("Charlie", "active"),
-            ("Diana", "active"),
-            ("Ethan", "inactive")
-        ]
-        cursor.executemany("INSERT INTO students (name, status) VALUES (?, ?)", sample_students)
     conn.commit()
     conn.close()
 
@@ -34,7 +22,7 @@ init_db()
 # --- Routes ---
 @app.route('/')
 def home():
-    return "Welcome to my Flask API with a repository database!"
+    return "Welcome to my Student Repository API!"
 
 # Get all students
 @app.route('/students', methods=['GET'])
@@ -59,7 +47,7 @@ def get_student(student_id):
         return jsonify({"id": row[0], "name": row[1], "status": row[2]})
     return jsonify({"error": "Student not found"}), 404
 
-# Add a new student
+# Add a new student (ACTION: Create)
 @app.route('/student', methods=['POST'])
 def add_student():
     data = request.get_json()
@@ -70,9 +58,9 @@ def add_student():
     cursor.execute("INSERT INTO students (name, status) VALUES (?, ?)", (name, status))
     conn.commit()
     conn.close()
-    return jsonify({"message": "Student added successfully"}), 201
+    return jsonify({"message": f"Student '{name}' added successfully"}), 201
 
-# Update an existing student
+# Edit an existing student (ACTION: Update)
 @app.route('/student/<int:student_id>', methods=['PUT'])
 def update_student(student_id):
     data = request.get_json()
@@ -83,9 +71,9 @@ def update_student(student_id):
     cursor.execute("UPDATE students SET name=?, status=? WHERE id=?", (name, status, student_id))
     conn.commit()
     conn.close()
-    return jsonify({"message": "Student updated successfully"})
+    return jsonify({"message": f"Student {student_id} updated successfully"})
 
-# Delete a student
+# Delete a student (ACTION: Delete)
 @app.route('/student/<int:student_id>', methods=['DELETE'])
 def delete_student(student_id):
     conn = sqlite3.connect("students.db")
@@ -93,7 +81,7 @@ def delete_student(student_id):
     cursor.execute("DELETE FROM students WHERE id=?", (student_id,))
     conn.commit()
     conn.close()
-    return jsonify({"message": "Student deleted successfully"})
+    return jsonify({"message": f"Student {student_id} deleted successfully"})
 
 if __name__ == "__main__":
     app.run(debug=True)
