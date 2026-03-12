@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string
 import sqlite3
 
 app = Flask(__name__)
@@ -19,40 +19,57 @@ def init_db():
 
 init_db()
 
-# --- Routes ---
-@app.route('/')
-def home():
-    return "Welcome to my Student Repository API!"
+# --- HTML Template ---
+html_template = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Repository</title>
+</head>
+<body>
+    <h1>Student Repository</h1>
+    <h2>All Students</h2>
+    <ul>
+        {% for student in students %}
+            <li>
+                ID: {{ student['id'] }} | Name: {{ student['name'] }} | Status: {{ student['status'] }}
+                <form action="/student/{{ student['id'] }}/delete" method="post" style="display:inline;">
+                    <button type="submit">Delete</button>
+                </form>
+                <form action="/student/{{ student['id'] }}/edit" method="post" style="display:inline;">
+                    <input type="text" name="name" placeholder="New name">
+                    <input type="text" name="status" placeholder="New status">
+                    <button type="submit">Edit</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
 
-# Get all students
+    <h2>Add Student</h2>
+    <form action="/student/add" method="post">
+        <input type="text" name="name" placeholder="Name" required>
+        <input type="text" name="status" placeholder="Status" required>
+        <button type="submit">Add</button>
+    </form>
+</body>
+</html>
+"""
+
+# --- Routes ---
 @app.route('/students', methods=['GET'])
-def get_students():
+def show_students():
     conn = sqlite3.connect("students.db")
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM students")
     rows = cursor.fetchall()
     conn.close()
     students = [{"id": r[0], "name": r[1], "status": r[2]} for r in rows]
-    return jsonify(students)
+    return render_template_string(html_template, students=students)
 
-# Get one student by ID
-@app.route('/student/<int:student_id>', methods=['GET'])
-def get_student(student_id):
-    conn = sqlite3.connect("students.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM students WHERE id=?", (student_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return jsonify({"id": row[0], "name": row[1], "status": row[2]})
-    return jsonify({"error": "Student not found"}), 404
-
-# Add a new student (ACTION: Create)
-@app.route('/student', methods=['POST'])
+@app.route('/student/add', methods=['POST'])
 def add_student():
-    data = request.get_json()
-    name = data.get("name")
-    status = data.get("status", "active")
+    name = request.form.get("name")
+    status = request.form.get("status")
     conn = sqlite3.connect("students.db")
     cursor = conn.cursor()
     cursor.execute("INSERT INTO students (name, status) VALUES (?, ?)", (name, status))
@@ -60,12 +77,10 @@ def add_student():
     conn.close()
     return jsonify({"message": f"Student '{name}' added successfully"}), 201
 
-# Edit an existing student (ACTION: Update)
-@app.route('/student/<int:student_id>', methods=['PUT'])
-def update_student(student_id):
-    data = request.get_json()
-    name = data.get("name")
-    status = data.get("status")
+@app.route('/student/<int:student_id>/edit', methods=['POST'])
+def edit_student(student_id):
+    name = request.form.get("name")
+    status = request.form.get("status")
     conn = sqlite3.connect("students.db")
     cursor = conn.cursor()
     cursor.execute("UPDATE students SET name=?, status=? WHERE id=?", (name, status, student_id))
@@ -73,8 +88,7 @@ def update_student(student_id):
     conn.close()
     return jsonify({"message": f"Student {student_id} updated successfully"})
 
-# Delete a student (ACTION: Delete)
-@app.route('/student/<int:student_id>', methods=['DELETE'])
+@app.route('/student/<int:student_id>/delete', methods=['POST'])
 def delete_student(student_id):
     conn = sqlite3.connect("students.db")
     cursor = conn.cursor()
