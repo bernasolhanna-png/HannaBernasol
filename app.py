@@ -1,40 +1,82 @@
 from flask import Flask, jsonify, request
+import sqlite3
 
 app = Flask(__name__)
 
-# Home route
+# --- Database Setup ---
+def init_db():
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- Routes ---
 @app.route('/')
 def home():
-    return "Welcome to my Flask API!"
+    return "Welcome to my Flask API with a repository database!"
 
-# Example JSON endpoint
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    sample_data = {"message": "Hello from the API!"}
-    return jsonify(sample_data)
-
-# Echo back posted JSON
-@app.route('/api/echo', methods=['POST'])
-def echo():
-    data = request.get_json()
-    return jsonify({"you_sent": data})
-
-# Single student endpoint
-@app.route('/student', methods=['GET'])
-def student():
-    student_info = {"id": 1, "name": "Alice", "status": "active"}
-    return jsonify(student_info)
-
-# Multiple students endpoint
 @app.route('/students', methods=['GET'])
-def students():
-    student_list = [
-        {"id": 1, "name": "Alice", "status": "active"},
-        {"id": 2, "name": "Bob", "status": "inactive"},
-        {"id": 3, "name": "Charlie", "status": "active"}
-    ]
-    return jsonify(student_list)
+def get_students():
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM students")
+    rows = cursor.fetchall()
+    conn.close()
+    students = [{"id": r[0], "name": r[1], "status": r[2]} for r in rows]
+    return jsonify(students)
+
+@app.route('/student/<int:student_id>', methods=['GET'])
+def get_student(student_id):
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM students WHERE id=?", (student_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return jsonify({"id": row[0], "name": row[1], "status": row[2]})
+    return jsonify({"error": "Student not found"}), 404
+
+@app.route('/student', methods=['POST'])
+def add_student():
+    data = request.get_json()
+    name = data.get("name")
+    status = data.get("status", "active")
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO students (name, status) VALUES (?, ?)", (name, status))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Student added successfully"}), 201
+
+@app.route('/student/<int:student_id>', methods=['PUT'])
+def update_student(student_id):
+    data = request.get_json()
+    name = data.get("name")
+    status = data.get("status")
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE students SET name=?, status=? WHERE id=?", (name, status, student_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Student updated successfully"})
+
+@app.route('/student/<int:student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    conn = sqlite3.connect("students.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM students WHERE id=?", (student_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Student deleted successfully"})
 
 if __name__ == "__main__":
-    # Run locally with Flask’s built-in server
     app.run(debug=True)
