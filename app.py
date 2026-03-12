@@ -24,6 +24,7 @@ init_db()
 def home():
     return "Welcome to my Flask API with a repository database!"
 
+# Get all students
 @app.route('/students', methods=['GET'])
 def get_students():
     conn = sqlite3.connect("students.db")
@@ -34,6 +35,7 @@ def get_students():
     students = [{"id": r[0], "name": r[1], "status": r[2]} for r in rows]
     return jsonify(students)
 
+# Get one student by ID
 @app.route('/student/<int:student_id>', methods=['GET'])
 def get_student(student_id):
     conn = sqlite3.connect("students.db")
@@ -45,6 +47,7 @@ def get_student(student_id):
         return jsonify({"id": row[0], "name": row[1], "status": row[2]})
     return jsonify({"error": "Student not found"}), 404
 
+# Add a new student
 @app.route('/student', methods=['POST'])
 def add_student():
     data = request.get_json()
@@ -57,6 +60,7 @@ def add_student():
     conn.close()
     return jsonify({"message": "Student added successfully"}), 201
 
+# Update an existing student
 @app.route('/student/<int:student_id>', methods=['PUT'])
 def update_student(student_id):
     data = request.get_json()
@@ -69,6 +73,7 @@ def update_student(student_id):
     conn.close()
     return jsonify({"message": "Student updated successfully"})
 
+# Delete a student
 @app.route('/student/<int:student_id>', methods=['DELETE'])
 def delete_student(student_id):
     conn = sqlite3.connect("students.db")
