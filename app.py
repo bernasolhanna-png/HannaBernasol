@@ -1,146 +1,83 @@
-from flask import Flask, request, render_template_string, redirect, url_for
-import sqlite3
+from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 import os
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hub.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# --- Database Setup ---
-def init_db():
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS employees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            role TEXT NOT NULL,
-            dept TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+# --- DATABASE MODELS ---
+class BlogPost(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    likes = db.Column(db.Integer, default=0)
 
-init_db()
+class Poll(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.String(200), nullable=False)
+    option_a = db.Column(db.String(100), nullable=False)
+    option_b = db.Column(db.String(100), nullable=False)
+    votes_a = db.Column(db.Integer, default=0)
+    votes_b = db.Column(db.Integer, default=0)
 
-# --- Combined HTML & CSS Template ---
-# This string contains the entire frontend layout and styling.
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Dashboard</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #3498db; pb: 10px; }
-        
-        /* Form Section */
-        .add-form { display: flex; gap: 10px; margin-bottom: 30px; background: #ecf0f1; padding: 15px; border-radius: 8px; }
-        input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; flex: 1; }
-        
-        /* Table Styles */
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #3498db; color: white; }
-        tr:hover { background-color: #f1f4f6; }
+class QuizScore(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
 
-        /* Buttons */
-        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-        .btn-add { background-color: #27ae60; }
-        .btn-update { background-color: #f39c12; }
-        .btn-delete { background-color: #e74c3c; }
-        .btn:hover { opacity: 0.8; }
-
-        .action-cell { display: flex; gap: 5px; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>Staff Directory Dashboard</h1>
-
-    <form class="add-form" action="/add" method="post">
-        <input type="text" name="name" placeholder="Name" required>
-        <input type="text" name="role" placeholder="Role" required>
-        <input type="text" name="dept" placeholder="Dept" required>
-        <button type="submit" class="btn btn-add">Add Employee</button>
-    </form>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Dept</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for emp in employees %}
-            <tr>
-                <form action="/edit/{{ emp[0] }}" method="post">
-                    <td><input type="text" name="name" value="{{ emp[1] }}" style="width: 90%;"></td>
-                    <td><input type="text" name="role" value="{{ emp[2] }}" style="width: 90%;"></td>
-                    <td><input type="text" name="dept" value="{{ emp[3] }}" style="width: 90%;"></td>
-                    <td class="action-cell">
-                        <button type="submit" class="btn btn-update">Update</button>
-                </form>
-                        <form action="/delete/{{ emp[0] }}" method="post" style="display:inline;">
-                            <button type="submit" class="btn btn-delete" onclick="return confirm('Are you sure?')">Delete</button>
-                        </form>
-                    </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-</body>
-</html>
-"""
-
-# --- CRUD Routes ---
-
+# --- ROUTES ---
 @app.route('/')
 def index():
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM employees")
-    employees = cursor.fetchall()
-    conn.close()
-    return render_template_string(HTML_TEMPLATE, employees=employees)
+    posts = BlogPost.query.order_by(BlogPost.id.desc()).all()
+    polls = Poll.query.all()
+    scores = QuizScore.query.order_by(QuizScore.score.desc()).limit(5).all()
+    return render_template('index.html', posts=posts, polls=polls, scores=scores)
 
-@app.route('/add', methods=['POST'])
-def add_employee():
-    name, role, dept = request.form.get("name"), request.form.get("role"), request.form.get("dept")
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO employees (name, role, dept) VALUES (?, ?, ?)", (name, role, dept))
-    conn.commit()
-    conn.close()
+@app.route('/like/<int:post_id>')
+def like_post(post_id):
+    post = BlogPost.query.get_or_404(post_id)
+    post.likes += 1
+    db.session.commit()
     return redirect(url_for('index'))
 
-@app.route('/edit/<int:id>', methods=['POST'])
-def edit_employee(id):
-    name, role, dept = request.form.get("name"), request.form.get("role"), request.form.get("dept")
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE employees SET name=?, role=?, dept=? WHERE id=?", (name, role, dept, id))
-    conn.commit()
-    conn.close()
+@app.route('/vote/<int:poll_id>/<string:option>')
+def vote_poll(poll_id, option):
+    poll = Poll.query.get_or_404(poll_id)
+    if option == 'a':
+        poll.votes_a += 1
+    elif option == 'b':
+        poll.votes_b += 1
+    db.session.commit()
     return redirect(url_for('index'))
 
-@app.route('/delete/<int:id>', methods=['POST'])
-def delete_employee(id):
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM employees WHERE id=?", (id,))
-    conn.commit()
-    conn.close()
+@app.route('/submit_quiz', methods=['POST'])
+def submit_quiz():
+    username = request.form.get('username', 'Anonymous')
+    # Simple hardcoded quiz logic for demonstration
+    answer = request.form.get('q1')
+    score = 100 if answer == '4' else 0
+    
+    new_score = QuizScore(username=username, score=score)
+    db.session.add(new_score)
+    db.session.commit()
     return redirect(url_for('index'))
 
-if __name__ == "__main__":
-    # Standard Render/Heroku port configuration
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+# --- INITIALIZATION ---
+def setup_database():
+    with app.app_context():
+        db.create_all()
+        # Seed data if empty
+        if not BlogPost.query.first():
+            db.session.add(BlogPost(title="Welcome to the Learning Hub", content="This is our first mini-blog post. Feel free to like it!"))
+            db.session.add(Poll(question="What is the best programming language for web APIs?", option_a="Python", option_b="PHP"))
+            db.session.commit()
+
+if __name__ == '__main__':
+    setup_database()
+    # Run locally
+    app.run(debug=True)
+else:
+    # Gunicorn setup
+    setup_database()
