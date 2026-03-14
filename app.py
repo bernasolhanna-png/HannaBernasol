@@ -4,7 +4,14 @@ from sqlalchemy.sql.expression import func
 import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz.db'
+
+# --- DEPLOYMENT READY DATABASE CONFIG ---
+# Automatically handles Render's Postgres URLs or falls back to local SQLite
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///quiz.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -16,67 +23,127 @@ class Question(db.Model):
     option_b = db.Column(db.String(200), nullable=False)
     option_c = db.Column(db.String(200), nullable=False)
     option_d = db.Column(db.String(200), nullable=False)
-    correct_option = db.Column(db.String(1), nullable=False) # 'A', 'B', 'C', or 'D'
+    correct_option = db.Column(db.String(1), nullable=False)
 
 class QuizScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
     score = db.Column(db.Integer, nullable=False)
 
-# --- HTML TEMPLATES ---
-INDEX_TEMPLATE = """
+# --- HTML TEMPLATES (WITH MODERN UI & ICONS) ---
+BASE_HEAD = """
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f3f4f6; font-family: 'Inter', sans-serif; color: #1f2937; }
+        .navbar-custom { background: linear-gradient(135deg, #4f46e5, #3b82f6); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .card { border-radius: 16px; border: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); }
+        
+        /* Custom styled radio buttons */
+        .option-label {
+            display: block; padding: 12px 20px; border: 2px solid #e5e7eb; border-radius: 10px; 
+            cursor: pointer; transition: all 0.2s ease; font-weight: 500;
+        }
+        .option-label:hover { border-color: #a5b4fc; background-color: #f8fafc; }
+        .form-check-input { display: none; } /* Hide default radio */
+        .form-check-input:checked + .option-label {
+            border-color: #4f46e5; background-color: #e0e7ff; color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        
+        .btn-primary { background-color: #4f46e5; border: none; padding: 10px 20px; font-weight: 600; border-radius: 10px; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-success { background-color: #10b981; border: none; padding: 12px; font-weight: 600; border-radius: 10px; }
+        .leaderboard-item { border-left: 4px solid transparent; transition: all 0.2s; }
+        .leaderboard-item:hover { background-color: #f8fafc; border-left-color: #4f46e5; }
+    </style>
+"""
+
+INDEX_TEMPLATE = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random Quiz</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f8f9fa; font-family: sans-serif; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    </style>
+    <title>Pro Quiz App</title>
+    {BASE_HEAD}
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-primary mb-4">
+    <nav class="navbar navbar-dark navbar-custom mb-5 py-3">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="/">🎯 Quiz App</a>
-            <a href="/add" class="btn btn-outline-light btn-sm">+ Add Question</a>
+            <a class="navbar-brand fw-bold fs-4" href="/"><i class="fa-solid fa-brain me-2"></i>ProQuiz</a>
+            <a href="/add" class="btn btn-light btn-sm fw-bold text-primary shadow-sm"><i class="fa-solid fa-plus me-1"></i> Add Question</a>
         </div>
     </nav>
     <div class="container">
-        {% if request.args.get('score') %}
-        <div class="alert alert-success text-center fw-bold">You scored {{ request.args.get('score') }} points!</div>
-        {% endif %}
-        <div class="row">
-            <div class="col-md-8">
+        {{% if request.args.get('score') %}}
+        <div class="alert alert-success text-center fw-bold shadow-sm mb-4 rounded-3 fs-5" role="alert">
+            <i class="fa-solid fa-trophy me-2 text-warning"></i> Quiz Complete! You scored {{ request.args.get('score') }} points!
+        </div>
+        {{% endif %}}
+        <div class="row g-4">
+            <div class="col-lg-8">
                 <form action="/submit_quiz" method="POST">
-                    {% for q in questions %}
-                    <div class="card mb-3 p-3">
-                        <h5>{{ loop.index }}. {{ q.text }}</h5>
-                        {% for choice in [('A', q.option_a), ('B', q.option_b), ('C', q.option_c), ('D', q.option_d)] %}
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="q_{{ q.id }}" value="{{ choice[0] }}" id="q{{ q.id }}{{ choice[0] }}" required>
-                            <label class="form-check-label" for="q{{ q.id }}{{ choice[0] }}">{{ choice[0] }}) {{ choice[1] }}</label>
+                    {{% if questions %}}
+                        {{% for q in questions %}}
+                        <div class="card p-4">
+                            <h5 class="mb-4 fw-bold text-dark"><i class="fa-regular fa-circle-question me-2 text-primary"></i>{{ loop.index }}. {{ q.text }}</h5>
+                            <div class="row g-3">
+                                {{% for choice in [('A', q.option_a), ('B', q.option_b), ('C', q.option_c), ('D', q.option_d)] %}}
+                                <div class="col-md-6">
+                                    <div class="form-check p-0">
+                                        <input class="form-check-input" type="radio" name="q_{{ q.id }}" value="{{ choice[0] }}" id="q{{ q.id }}{{ choice[0] }}" required>
+                                        <label class="option-label" for="q{{ q.id }}{{ choice[0] }}">
+                                            <span class="badge bg-secondary me-2">{{ choice[0] }}</span> {{ choice[1] }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {{% endfor %}}
+                            </div>
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% endfor %}
-                    <div class="card p-3 mb-5">
-                        <input type="text" name="username" class="form-control mb-2" placeholder="Your Name" required>
-                        <button type="submit" class="btn btn-success w-100">Submit Quiz</button>
-                    </div>
+                        {{% endfor %}}
+                        <div class="card p-4 mb-5 bg-white">
+                            <h5 class="fw-bold mb-3"><i class="fa-solid fa-user-pen me-2"></i>Save Your Score</h5>
+                            <div class="input-group mb-3 shadow-sm rounded-3">
+                                <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-user text-muted"></i></span>
+                                <input type="text" name="username" class="form-control border-start-0 py-2" placeholder="Enter your name" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fs-5"><i class="fa-solid fa-paper-plane me-2"></i>Submit Quiz</button>
+                        </div>
+                    {{% else %}}
+                        <div class="text-center p-5 bg-white rounded-4 shadow-sm">
+                            <i class="fa-solid fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h4>No questions available</h4>
+                            <p class="text-muted">Be the first to add some questions to the database!</p>
+                        </div>
+                    {{% endif %}}
                 </form>
             </div>
-            <div class="col-md-4">
-                <h4 class="fw-bold">🏆 Top 10 Scores</h4>
-                <ul class="list-group">
-                    {% for s in scores %}
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>{{ s.username }}</span> <b>{{ s.score }} pts</b>
-                    </li>
-                    {% endfor %}
-                </ul>
+            
+            <div class="col-lg-4">
+                <div class="card p-0 overflow-hidden sticky-top" style="top: 20px;">
+                    <div class="bg-dark text-white p-3 text-center">
+                        <h5 class="fw-bold mb-0"><i class="fa-solid fa-ranking-star me-2 text-warning"></i>Leaderboard</h5>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {{% for s in scores %}}
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3 leaderboard-item">
+                            <span>
+                                {{% if loop.index == 1 %}}<i class="fa-solid fa-medal text-warning me-2 fs-5"></i>
+                                {{% elif loop.index == 2 %}}<i class="fa-solid fa-medal text-secondary me-2 fs-5"></i>
+                                {{% elif loop.index == 3 %}}<i class="fa-solid fa-medal text-danger me-2 fs-5" style="color: #cd7f32 !important;"></i>
+                                {{% else %}}<span class="text-muted fw-bold me-3 ms-2">{{ loop.index }}</span>{{% endif %}}
+                                <span class="fw-semibold">{{ s.username }}</span>
+                            </span>
+                            <span class="badge bg-primary rounded-pill">{{ s.score }} pts</span>
+                        </li>
+                        {{% else %}}
+                        <li class="list-group-item text-center text-muted p-4">No scores yet. Play to be #1!</li>
+                        {{% endfor %}}
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -84,29 +151,74 @@ INDEX_TEMPLATE = """
 </html>
 """
 
-ADD_TEMPLATE = """
+ADD_TEMPLATE = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>Add Question</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Add Question - ProQuiz</title>
+    {BASE_HEAD}
 </head>
-<body class="bg-light">
+<body>
+    <nav class="navbar navbar-dark navbar-custom mb-5 py-3">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-4" href="/"><i class="fa-solid fa-brain me-2"></i>ProQuiz</a>
+        </div>
+    </nav>
     <div class="container mt-5">
-        <div class="card p-4 mx-auto" style="max-width: 600px;">
-            <h3 class="mb-3">Add New Question</h3>
+        <div class="card p-5 mx-auto shadow-lg" style="max-width: 600px;">
+            <div class="text-center mb-4">
+                <i class="fa-solid fa-square-plus fa-3x text-primary mb-2"></i>
+                <h3 class="fw-bold">Add New Question</h3>
+                <p class="text-muted">Expand the knowledge base!</p>
+            </div>
             <form method="POST">
-                <textarea name="text" class="form-control mb-2" placeholder="Question Text" required></textarea>
-                <input type="text" name="option_a" class="form-control mb-2" placeholder="Option A" required>
-                <input type="text" name="option_b" class="form-control mb-2" placeholder="Option B" required>
-                <input type="text" name="option_c" class="form-control mb-2" placeholder="Option C" required>
-                <input type="text" name="option_d" class="form-control mb-2" placeholder="Option D" required>
-                <select name="correct_option" class="form-select mb-3" required>
-                    <option value="A">A is correct</option><option value="B">B is correct</option>
-                    <option value="C">C is correct</option><option value="D">D is correct</option>
-                </select>
-                <button type="submit" class="btn btn-primary w-100">Save Question</button>
-                <a href="/" class="btn btn-link w-100 mt-2">Back to Quiz</a>
+                <div class="mb-3">
+                    <label class="form-label fw-bold"><i class="fa-solid fa-pen me-2"></i>Question Text</label>
+                    <textarea name="text" class="form-control bg-light" rows="3" placeholder="What is the capital of..." required></textarea>
+                </div>
+                
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold text-primary">A</span>
+                            <input type="text" name="option_a" class="form-control" placeholder="Option A" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold text-primary">B</span>
+                            <input type="text" name="option_b" class="form-control" placeholder="Option B" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold text-primary">C</span>
+                            <input type="text" name="option_c" class="form-control" placeholder="Option C" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold text-primary">D</span>
+                            <input type="text" name="option_d" class="form-control" placeholder="Option D" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fa-solid fa-check-circle me-2 text-success"></i>Correct Answer</label>
+                    <select name="correct_option" class="form-select bg-light" required>
+                        <option value="" disabled selected>Select the correct option...</option>
+                        <option value="A">Option A</option>
+                        <option value="B">Option B</option>
+                        <option value="C">Option C</option>
+                        <option value="D">Option D</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100 py-2 fs-5"><i class="fa-solid fa-floppy-disk me-2"></i>Save Question</button>
+                <div class="text-center mt-3">
+                    <a href="/" class="text-decoration-none text-muted"><i class="fa-solid fa-arrow-left me-1"></i> Back to Quiz</a>
+                </div>
             </form>
         </div>
     </div>
@@ -117,6 +229,7 @@ ADD_TEMPLATE = """
 # --- ROUTES ---
 @app.route('/')
 def index():
+    # SQLite uses RANDOM(), Postgres uses RANDOM(). SQLAlchemy's func.random() maps correctly.
     random_questions = Question.query.order_by(func.random()).limit(10).all()
     top_scores = QuizScore.query.order_by(QuizScore.score.desc()).limit(10).all()
     return render_template_string(INDEX_TEMPLATE, questions=random_questions, scores=top_scores)
@@ -131,17 +244,24 @@ def submit_quiz():
             q = Question.query.get(q_id)
             if q and q.correct_option == value:
                 score += 10
-    db.session.add(QuizScore(username=username, score=score))
-    db.session.commit()
+    
+    # Save score if they actually answered questions
+    if score > 0 or any(k.startswith('q_') for k in request.form):
+        db.session.add(QuizScore(username=username, score=score))
+        db.session.commit()
+        
     return redirect(url_for('index', score=score))
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_question():
     if request.method == 'POST':
         new_q = Question(
-            text=request.form.get('text'), option_a=request.form.get('option_a'),
-            option_b=request.form.get('option_b'), option_c=request.form.get('option_c'),
-            option_d=request.form.get('option_d'), correct_option=request.form.get('correct_option')
+            text=request.form.get('text'), 
+            option_a=request.form.get('option_a'),
+            option_b=request.form.get('option_b'), 
+            option_c=request.form.get('option_c'),
+            option_d=request.form.get('option_d'), 
+            correct_option=request.form.get('correct_option')
         )
         db.session.add(new_q)
         db.session.commit()
@@ -155,11 +275,13 @@ with app.app_context():
         seeds = [
             ("What is 5+5?", "10", "12", "15", "20", "A"),
             ("Python is a...", "Fruit", "Programming Language", "Car", "Movie", "B"),
-            ("Web Framework for Python?", "React", "Flask", "Laravel", "Spring", "B")
+            ("What is the preferred Web Framework for this app?", "React", "Flask", "Laravel", "Spring", "B"),
+            ("Which HTML tag is used for the largest heading?", "<h6>", "<header>", "<h1>", "<head>", "C")
         ]
         for s in seeds:
             db.session.add(Question(text=s[0], option_a=s[1], option_b=s[2], option_c=s[3], option_d=s[4], correct_option=s[5]))
         db.session.commit()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Recommended for production deployment: Gunicorn
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
