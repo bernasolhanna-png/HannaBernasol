@@ -63,12 +63,42 @@ BASE_HEAD = """
     </style>
 """
 
-INDEX_TEMPLATE = f"""
+# --- HTML TEMPLATES (CORRECTED) ---
+
+INDEX_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Pro Quiz App</title>
-    {BASE_HEAD}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f3f4f6; font-family: 'Inter', sans-serif; color: #1f2937; }
+        .navbar-custom { background: linear-gradient(135deg, #4f46e5, #3b82f6); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .card { border-radius: 16px; border: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); }
+        
+        /* Custom styled radio buttons */
+        .option-label {
+            display: block; padding: 12px 20px; border: 2px solid #e5e7eb; border-radius: 10px; 
+            cursor: pointer; transition: all 0.2s ease; font-weight: 500;
+        }
+        .option-label:hover { border-color: #a5b4fc; background-color: #f8fafc; }
+        .form-check-input { display: none; } /* Hide default radio */
+        .form-check-input:checked + .option-label {
+            border-color: #4f46e5; background-color: #e0e7ff; color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        
+        .btn-primary { background-color: #4f46e5; border: none; padding: 10px 20px; font-weight: 600; border-radius: 10px; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-success { background-color: #10b981; border: none; padding: 12px; font-weight: 600; border-radius: 10px; }
+        .leaderboard-item { border-left: 4px solid transparent; transition: all 0.2s; }
+        .leaderboard-item:hover { background-color: #f8fafc; border-left-color: #4f46e5; }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-dark navbar-custom mb-5 py-3">
@@ -78,20 +108,20 @@ INDEX_TEMPLATE = f"""
         </div>
     </nav>
     <div class="container">
-        {{% if request.args.get('score') %}}
+        {% if request.args.get('score') %}
         <div class="alert alert-success text-center fw-bold shadow-sm mb-4 rounded-3 fs-5" role="alert">
             <i class="fa-solid fa-trophy me-2 text-warning"></i> Quiz Complete! You scored {{ request.args.get('score') }} points!
         </div>
-        {{% endif %}}
+        {% endif %}
         <div class="row g-4">
             <div class="col-lg-8">
                 <form action="/submit_quiz" method="POST">
-                    {{% if questions %}}
-                        {{% for q in questions %}}
+                    {% if questions %}
+                        {% for q in questions %}
                         <div class="card p-4">
                             <h5 class="mb-4 fw-bold text-dark"><i class="fa-regular fa-circle-question me-2 text-primary"></i>{{ loop.index }}. {{ q.text }}</h5>
                             <div class="row g-3">
-                                {{% for choice in [('A', q.option_a), ('B', q.option_b), ('C', q.option_c), ('D', q.option_d)] %}}
+                                {% for choice in [('A', q.option_a), ('B', q.option_b), ('C', q.option_c), ('D', q.option_d)] %}
                                 <div class="col-md-6">
                                     <div class="form-check p-0">
                                         <input class="form-check-input" type="radio" name="q_{{ q.id }}" value="{{ choice[0] }}" id="q{{ q.id }}{{ choice[0] }}" required>
@@ -100,10 +130,10 @@ INDEX_TEMPLATE = f"""
                                         </label>
                                     </div>
                                 </div>
-                                {{% endfor %}}
+                                {% endfor %}
                             </div>
                         </div>
-                        {{% endfor %}}
+                        {% endfor %}
                         <div class="card p-4 mb-5 bg-white">
                             <h5 class="fw-bold mb-3"><i class="fa-solid fa-user-pen me-2"></i>Save Your Score</h5>
                             <div class="input-group mb-3 shadow-sm rounded-3">
@@ -112,13 +142,13 @@ INDEX_TEMPLATE = f"""
                             </div>
                             <button type="submit" class="btn btn-success w-100 fs-5"><i class="fa-solid fa-paper-plane me-2"></i>Submit Quiz</button>
                         </div>
-                    {{% else %}}
+                    {% else %}
                         <div class="text-center p-5 bg-white rounded-4 shadow-sm">
                             <i class="fa-solid fa-folder-open fa-3x text-muted mb-3"></i>
                             <h4>No questions available</h4>
                             <p class="text-muted">Be the first to add some questions to the database!</p>
                         </div>
-                    {{% endif %}}
+                    {% endif %}
                 </form>
             </div>
             
@@ -128,20 +158,20 @@ INDEX_TEMPLATE = f"""
                         <h5 class="fw-bold mb-0"><i class="fa-solid fa-ranking-star me-2 text-warning"></i>Leaderboard</h5>
                     </div>
                     <ul class="list-group list-group-flush">
-                        {{% for s in scores %}}
+                        {% for s in scores %}
                         <li class="list-group-item d-flex justify-content-between align-items-center p-3 leaderboard-item">
                             <span>
-                                {{% if loop.index == 1 %}}<i class="fa-solid fa-medal text-warning me-2 fs-5"></i>
-                                {{% elif loop.index == 2 %}}<i class="fa-solid fa-medal text-secondary me-2 fs-5"></i>
-                                {{% elif loop.index == 3 %}}<i class="fa-solid fa-medal text-danger me-2 fs-5" style="color: #cd7f32 !important;"></i>
-                                {{% else %}}<span class="text-muted fw-bold me-3 ms-2">{{ loop.index }}</span>{{% endif %}}
+                                {% if loop.index == 1 %}<i class="fa-solid fa-medal text-warning me-2 fs-5"></i>
+                                {% elif loop.index == 2 %}<i class="fa-solid fa-medal text-secondary me-2 fs-5"></i>
+                                {% elif loop.index == 3 %}<i class="fa-solid fa-medal text-danger me-2 fs-5" style="color: #cd7f32 !important;"></i>
+                                {% else %}<span class="text-muted fw-bold me-3 ms-2">{{ loop.index }}</span>{% endif %}
                                 <span class="fw-semibold">{{ s.username }}</span>
                             </span>
                             <span class="badge bg-primary rounded-pill">{{ s.score }} pts</span>
                         </li>
-                        {{% else %}}
+                        {% else %}
                         <li class="list-group-item text-center text-muted p-4">No scores yet. Play to be #1!</li>
-                        {{% endfor %}}
+                        {% endfor %}
                     </ul>
                 </div>
             </div>
@@ -151,12 +181,23 @@ INDEX_TEMPLATE = f"""
 </html>
 """
 
-ADD_TEMPLATE = f"""
+ADD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Add Question - ProQuiz</title>
-    {BASE_HEAD}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f3f4f6; font-family: 'Inter', sans-serif; color: #1f2937; }
+        .navbar-custom { background: linear-gradient(135deg, #4f46e5, #3b82f6); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .card { border-radius: 16px; border: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 1.5rem; transition: transform 0.2s; }
+        .btn-primary { background-color: #4f46e5; border: none; padding: 10px 20px; font-weight: 600; border-radius: 10px; }
+        .btn-primary:hover { background-color: #4338ca; }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-dark navbar-custom mb-5 py-3">
