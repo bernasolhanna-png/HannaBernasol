@@ -38,40 +38,75 @@ def index():
     conn.close()
 
     return render_template_string('''
-    <h2>Student Information System</h2>
-
-    <a href="/add">Add Student</a>
-
-    <table border="1" cellpadding="5">
-    <tr>
-        <th>Student ID</th>
-        <th>Name</th>
-        <th>Course</th>
-        <th>Year</th>
-        <th>1st Sem</th>
-        <th>2nd Sem</th>
-        <th>GPA</th>
-        <th>Status</th>
-        <th>Action</th>
-    </tr>
-
-    {% for s in students %}
-    <tr>
-        <td>{{s.student_id}}</td>
-        <td>{{s.name}}</td>
-        <td>{{s.course}}</td>
-        <td>{{s.year_level}}</td>
-        <td>{{s.first_sem}}</td>
-        <td>{{s.second_sem}}</td>
-        <td>{{s.gpa}}</td>
-        <td>{{s.status}}</td>
-        <td>
-            <a href="/edit/{{s.id}}">Edit</a>
-            <a href="/delete/{{s.id}}">Delete</a>
-        </td>
-    </tr>
-    {% endfor %}
-    </table>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Student Information System</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <style> body { background-color: #f8f9fa; } </style>
+    </head>
+    <body>
+        <div class="container mt-5">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="text-primary fw-bold"><i class="fas fa-user-graduate"></i> Student Information System</h2>
+                <a href="/add" class="btn btn-success shadow-sm"><i class="fas fa-plus"></i> Add New Student</a>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0 align-middle text-center">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Course</th>
+                                    <th>Year</th>
+                                    <th>1st Sem</th>
+                                    <th>2nd Sem</th>
+                                    <th>GPA</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in students %}
+                                <tr>
+                                    <td class="fw-bold text-secondary">{{s.student_id}}</td>
+                                    <td class="text-start">{{s.name}}</td>
+                                    <td>{{s.course}}</td>
+                                    <td>{{s.year_level}}</td>
+                                    <td>{{s.first_sem}}</td>
+                                    <td>{{s.second_sem}}</td>
+                                    <td class="fw-bold">{{s.gpa}}</td>
+                                    <td>
+                                        {% if s.status == 'Passed' %}
+                                            <span class="badge bg-success">Passed</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/edit/{{s.id}}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Edit</a>
+                                        <a href="/delete/{{s.id}}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this record?');"><i class="fas fa-trash"></i> Delete</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-muted py-4">No students found. Click "Add New Student" to get started.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     ''', students=students)
 
 
@@ -79,7 +114,6 @@ def index():
 @app.route('/add', methods=['GET','POST'])
 def add():
     if request.method == 'POST':
-
         student_id = request.form['student_id']
         name = request.form['name']
         course = request.form['course']
@@ -101,46 +135,79 @@ def add():
         return redirect('/')
 
     return render_template_string('''
-    <h2>Add Student</h2>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Add Student</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-primary text-white py-3">
+                            <h4 class="mb-0">Add New Student</h4>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="post">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Student ID</label>
+                                        <input type="text" class="form-control" name="student_id" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Full Name</label>
+                                        <input type="text" class="form-control" name="name" required>
+                                    </div>
+                                </div>
 
-    <form method="post">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-bold">Course</label>
+                                        <input type="text" class="form-control" name="course" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Year Level</label>
+                                        <input type="number" class="form-control" name="year_level" min="1" max="5" required>
+                                    </div>
+                                </div>
 
-    Student ID<br>
-    <input type="text" name="student_id"><br>
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">1st Sem Grade</label>
+                                        <input type="number" step="0.01" class="form-control" name="first_sem" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">2nd Sem Grade</label>
+                                        <input type="number" step="0.01" class="form-control" name="second_sem" required>
+                                    </div>
+                                </div>
 
-    Name<br>
-    <input type="text" name="name"><br>
-
-    Course<br>
-    <input type="text" name="course"><br>
-
-    Year Level<br>
-    <input type="number" name="year_level"><br>
-
-    1st Sem<br>
-    <input type="number" step="0.01" name="first_sem"><br>
-
-    2nd Sem<br>
-    <input type="number" step="0.01" name="second_sem"><br><br>
-
-    <button type="submit">Save</button>
-
-    </form>
-
-    <br>
-    <a href="/">Back</a>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="/" class="btn btn-secondary px-4">Cancel</a>
+                                    <button type="submit" class="btn btn-success px-4">Save Record</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     ''')
 
 
 # EDIT STUDENT (UPDATE)
 @app.route('/edit/<int:id>', methods=['GET','POST'])
 def edit(id):
-
     conn = get_db()
     student = conn.execute("SELECT * FROM students WHERE id=?", (id,)).fetchone()
 
     if request.method == 'POST':
-
         student_id = request.form['student_id']
         name = request.form['name']
         course = request.form['course']
@@ -155,7 +222,6 @@ def edit(id):
             "UPDATE students SET student_id=?,name=?,course=?,year_level=?,first_sem=?,second_sem=?,gpa=?,status=? WHERE id=?",
             (student_id,name,course,year_level,first_sem,second_sem,gpa,status,id)
         )
-
         conn.commit()
         conn.close()
 
@@ -164,41 +230,75 @@ def edit(id):
     conn.close()
 
     return render_template_string('''
-    <h2>Edit Student</h2>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Edit Student</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-primary text-white py-3">
+                            <h4 class="mb-0">Edit Student Record</h4>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="post">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Student ID</label>
+                                        <input type="text" class="form-control" name="student_id" value="{{s.student_id}}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Full Name</label>
+                                        <input type="text" class="form-control" name="name" value="{{s.name}}" required>
+                                    </div>
+                                </div>
 
-    <form method="post">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-bold">Course</label>
+                                        <input type="text" class="form-control" name="course" value="{{s.course}}" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Year Level</label>
+                                        <input type="number" class="form-control" name="year_level" value="{{s.year_level}}" min="1" max="5" required>
+                                    </div>
+                                </div>
 
-    Student ID<br>
-    <input type="text" name="student_id" value="{{s.student_id}}"><br>
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">1st Sem Grade</label>
+                                        <input type="number" step="0.01" class="form-control" name="first_sem" value="{{s.first_sem}}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">2nd Sem Grade</label>
+                                        <input type="number" step="0.01" class="form-control" name="second_sem" value="{{s.second_sem}}" required>
+                                    </div>
+                                </div>
 
-    Name<br>
-    <input type="text" name="name" value="{{s.name}}"><br>
-
-    Course<br>
-    <input type="text" name="course" value="{{s.course}}"><br>
-
-    Year Level<br>
-    <input type="number" name="year_level" value="{{s.year_level}}"><br>
-
-    1st Sem<br>
-    <input type="number" step="0.01" name="first_sem" value="{{s.first_sem}}"><br>
-
-    2nd Sem<br>
-    <input type="number" step="0.01" name="second_sem" value="{{s.second_sem}}"><br><br>
-
-    <button type="submit">Update</button>
-
-    </form>
-
-    <br>
-    <a href="/">Back</a>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="/" class="btn btn-secondary px-4">Cancel</a>
+                                    <button type="submit" class="btn btn-primary px-4">Update Record</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     ''', s=student)
 
 
 # DELETE STUDENT
 @app.route('/delete/<int:id>')
 def delete(id):
-
     conn = get_db()
     conn.execute("DELETE FROM students WHERE id=?", (id,))
     conn.commit()
