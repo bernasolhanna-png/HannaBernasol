@@ -9,7 +9,6 @@ app = Flask(__name__)
 DB_URL = "postgresql://postgres:Pusanitoji2005@db.msoslvbectkjqbfgmeei.supabase.co:5432/postgres"
 
 def get_db():
-    # Connect to your Supabase PostgreSQL database
     conn = psycopg2.connect(DB_URL)
     return conn
 
@@ -19,31 +18,33 @@ def index():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    # Get all students
-    cur.execute("SELECT * FROM students ORDER BY id ASC")
-    students = cur.fetchall()
-    
-    # --- DATA ANALYTICS LOGIC ---
-    cur.execute("SELECT COUNT(*) FROM students")
-    total_students = cur.fetchone()['count']
-    
-    cur.execute("SELECT COUNT(*) FROM students WHERE status='Passed'")
-    passed = cur.fetchone()['count']
-    
-    cur.execute("SELECT COUNT(*) FROM students WHERE status='Failed'")
-    failed = cur.fetchone()['count']
-    
-    cur.execute("SELECT AVG(gpa) FROM students")
-    avg_gpa_row = cur.fetchone()['avg']
-    avg_gpa = round(float(avg_gpa_row), 2) if avg_gpa_row else 0.0
+    try:
+        # Get all students
+        cur.execute("SELECT * FROM students ORDER BY id ASC")
+        students = cur.fetchall()
+        
+        # --- DATA ANALYTICS LOGIC ---
+        cur.execute("SELECT COUNT(*) FROM students")
+        total_students = int(cur.fetchone()['count'])
+        
+        cur.execute("SELECT COUNT(*) FROM students WHERE status='Passed'")
+        passed = int(cur.fetchone()['count'])
+        
+        cur.execute("SELECT COUNT(*) FROM students WHERE status='Failed'")
+        failed = int(cur.fetchone()['count'])
+        
+        cur.execute("SELECT AVG(gpa) FROM students")
+        avg_gpa_row = cur.fetchone()['avg']
+        avg_gpa = round(float(avg_gpa_row), 2) if avg_gpa_row is not None else 0.0
 
-    cur.execute("SELECT course, COUNT(*) FROM students GROUP BY course")
-    course_data = cur.fetchall()
-    courses = [row['course'] for row in course_data]
-    course_counts = [row['count'] for row in course_data]
-    
-    cur.close()
-    conn.close()
+        cur.execute("SELECT course, COUNT(*) FROM students GROUP BY course")
+        course_data = cur.fetchall()
+        courses = [row['course'] for row in course_data]
+        course_counts = [int(row['count']) for row in course_data]
+        
+    finally:
+        cur.close()
+        conn.close()
 
     return render_template_string('''
     <!DOCTYPE html>
@@ -166,8 +167,8 @@ def index():
         <script>
             const courses = {{ courses | tojson }};
             const courseCounts = {{ course_counts | tojson }};
-            const passed = {{ passed }};
-            const failed = {{ failed }};
+            const passedCount = {{ passed }};
+            const failedCount = {{ failed }};
 
             if (courses.length > 0) {
                 const ctxCourse = document.getElementById('courseChart').getContext('2d');
@@ -188,20 +189,20 @@ def index():
                         scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                     }
                 });
-
-                const ctxStatus = document.getElementById('statusChart').getContext('2d');
-                new Chart(ctxStatus, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Passed', 'Failed'],
-                        datasets: [{
-                            data: [passed, failed],
-                            backgroundColor: ['#198754', '#dc3545']
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
             }
+
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Passed', 'Failed'],
+                    datasets: [{
+                        data: [passedCount, failedCount],
+                        backgroundColor: ['#198754', '#dc3545']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
         </script>
     </body>
     </html>
@@ -219,7 +220,7 @@ def add():
         first_sem = float(request.form['first_sem'])
         second_sem = float(request.form['second_sem'])
 
-        gpa = (first_sem + second_sem) / 2
+        gpa = round((first_sem + second_sem) / 2, 2)
         status = "Passed" if gpa <= 3.0 else "Failed"
 
         conn = get_db()
@@ -311,7 +312,7 @@ def edit(id):
         first_sem = float(request.form['first_sem'])
         second_sem = float(request.form['second_sem'])
 
-        gpa = (first_sem + second_sem) / 2
+        gpa = round((first_sem + second_sem) / 2, 2)
         status = "Passed" if gpa <= 3.0 else "Failed"
 
         cur.execute(
