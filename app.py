@@ -1,5 +1,6 @@
 from flask import Flask, request, redirect, render_template_string
 import sqlite3
+import json
 
 app = Flask(__name__)
 
@@ -30,11 +31,26 @@ def create_table():
 
 create_table()
 
-# HOME PAGE (READ)
+# HOME PAGE (READ & ANALYTICS)
 @app.route('/')
 def index():
     conn = get_db()
+    
+    # Get all students for the table
     students = conn.execute("SELECT * FROM students").fetchall()
+    
+    # --- DATA ANALYTICS LOGIC ---
+    total_students = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+    passed = conn.execute("SELECT COUNT(*) FROM students WHERE status='Passed'").fetchone()[0]
+    failed = conn.execute("SELECT COUNT(*) FROM students WHERE status='Failed'").fetchone()[0]
+    
+    avg_gpa_row = conn.execute("SELECT AVG(gpa) FROM students").fetchone()[0]
+    avg_gpa = round(avg_gpa_row, 2) if avg_gpa_row else 0.0
+
+    course_data = conn.execute("SELECT course, COUNT(*) FROM students GROUP BY course").fetchall()
+    courses = [row[0] for row in course_data]
+    course_counts = [row[1] for row in course_data]
+    
     conn.close()
 
     return render_template_string('''
@@ -46,20 +62,69 @@ def index():
         <title>Student Information System</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style> body { background-color: #f8f9fa; } </style>
     </head>
     <body>
-        <div class="container mt-5">
+        <div class="container mt-5 mb-5">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="text-primary fw-bold"><i class="fas fa-user-graduate"></i> Student Information System</h2>
                 <a href="/add" class="btn btn-success shadow-sm"><i class="fas fa-plus"></i> Add New Student</a>
             </div>
             
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Data Analytics Dashboard</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-4">
+                        <div class="col-md-3">
+                            <div class="p-3 bg-primary bg-opacity-10 rounded border border-primary text-primary">
+                                <h6>Total Students</h6>
+                                <h3 class="fw-bold mb-0">{{ total }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-success bg-opacity-10 rounded border border-success text-success">
+                                <h6>Passed</h6>
+                                <h3 class="fw-bold mb-0">{{ passed }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-danger bg-opacity-10 rounded border border-danger text-danger">
+                                <h6>Failed</h6>
+                                <h3 class="fw-bold mb-0">{{ failed }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-warning bg-opacity-10 rounded border border-warning text-dark">
+                                <h6>Average GPA</h6>
+                                <h3 class="fw-bold mb-0">{{ avg_gpa }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="text-center text-muted mb-3">Students per Course</h6>
+                            <canvas id="courseChart" height="100"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-center text-muted mb-3">Pass vs Fail Ratio</h6>
+                            <canvas id="statusChart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0 text-secondary"><i class="fas fa-list me-2"></i>Student Records</h5>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover table-striped mb-0 align-middle text-center">
-                            <thead class="table-dark">
+                            <thead class="table-light">
                                 <tr>
                                     <th>Student ID</th>
                                     <th>Name</th>
@@ -90,8 +155,8 @@ def index():
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="/edit/{{s.id}}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Edit</a>
-                                        <a href="/delete/{{s.id}}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this record?');"><i class="fas fa-trash"></i> Delete</a>
+                                        <a href="/edit/{{s.id}}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                        <a href="/delete/{{s.id}}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this record?');"><i class="fas fa-trash"></i></a>
                                     </td>
                                 </tr>
                                 {% else %}
@@ -105,9 +170,54 @@ def index():
                 </div>
             </div>
         </div>
+
+        <script>
+            // Data passed from Flask to JS securely
+            const courses = {{ courses | tojson }};
+            const courseCounts = {{ course_counts | tojson }};
+            const passed = {{ passed }};
+            const failed = {{ failed }};
+
+            // Only render charts if there's data
+            if (courses.length > 0) {
+                // Bar Chart: Students per Course
+                const ctxCourse = document.getElementById('courseChart').getContext('2d');
+                new Chart(ctxCourse, {
+                    type: 'bar',
+                    data: {
+                        labels: courses,
+                        datasets: [{
+                            label: 'Number of Students',
+                            data: courseCounts,
+                            backgroundColor: '#0d6efd',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: { 
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    }
+                });
+
+                // Doughnut Chart: Pass vs Fail
+                const ctxStatus = document.getElementById('statusChart').getContext('2d');
+                new Chart(ctxStatus, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Passed', 'Failed'],
+                        datasets: [{
+                            data: [passed, failed],
+                            backgroundColor: ['#198754', '#dc3545']
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        </script>
     </body>
     </html>
-    ''', students=students)
+    ''', students=students, total=total_students, passed=passed, failed=failed, avg_gpa=avg_gpa, courses=courses, course_counts=course_counts)
 
 
 # ADD STUDENT (CREATE)
