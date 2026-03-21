@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 # SUPABASE CONNECTION STRING
 # It is highly recommended to fetch this from an environment variable rather than hardcoding it.
-DB_URL = os.environ.get("SUPABASE_DB_URL", "postgresql://postgres:Pusanitoji2005@db.msoslvbectkjqbfgmeei.supabase.co:5432/postgres?sslmode=require")
+DB_URL = os.environ.get("SUPABASE_DB_URL", "postgresql://postgres:Pusanitoji2005@db.msoslvbectkjqbfgmeei.supabase.co:6543/postgres?sslmode=require")
 
 def get_db():
     conn = psycopg2.connect(DB_URL)
